@@ -17,7 +17,6 @@ class InsMem(object):
         # read instruction memory
         # return 32 bit hex val
         bin32 = 0
-        # print(ReadAddress)
         for i in range(ReadAddress, ReadAddress + 4):
             bin32 = bin32 | int('0b' + self.IMem[i], 2)
             if i < ReadAddress + 3:
@@ -30,7 +29,6 @@ class DataMem(object):
     def __init__(self, name, ioDir):
         self.id = name
         self.ioDir = ioDir
-        # print(ioDir + "/dmem.txt")
         with open(ioDir + "/dmem.txt") as dm:
             self.DMem = [data.replace("\n", "") for data in dm.readlines()]
         self.DMem = self.DMem + (['00000000'] * (MemSize - len(self.DMem)))
@@ -143,7 +141,6 @@ def getRdResultsI(funct3, data_rs1, data_imm):
     # ADDI
     if funct3 == 0b000:
         data_rd = data_rs1 + twos_comp(val=data_imm, sign_bit=11)
-        # print(bin(twos_comp(data_imm)))
 
     # XORI
     if funct3 == 0b100:
@@ -162,7 +159,7 @@ def getRdResultsI(funct3, data_rs1, data_imm):
 
 def twos_comp(val, sign_bit):
     """compute the 2's complement of int value val"""
-    # print(bin(val))
+
     if (val & (1 << sign_bit)) != 0:  # if sign bit is set e.g., 8bit: 128-255
         val = val - (1 << (sign_bit + 1))  # compute negative value
     return val  # return positive value as is
@@ -174,6 +171,7 @@ class SingleStageCore(Core):
         self.opFilePath = ioDir + "\\StateResult_SS.txt"
 
     def step(self):
+
         # Your implementation
         fetchedInstr = int(self.ext_imem.readInstr(self.state.IF["PC"]), 16)
         opcode = fetchedInstr & (2 ** 7 - 1)
@@ -268,7 +266,6 @@ class SingleStageCore(Core):
                 data_rs1 = self.myRF.readRF(rs1)
                 data_rs2 = self.myRF.readRF(rs2)
                 if data_rs1 != data_rs2:
-                    # print("imm: " + str(twos_comp(val=imm)))
                     self.nextState.IF["PC"] = self.state.IF["PC"] + twos_comp(val=imm, sign_bit=12)
                     self.state.IF["taken"] = True
 
@@ -277,8 +274,6 @@ class SingleStageCore(Core):
 
             # get imm
             imm = fetchedInstr >> 20
-            # get funct3
-            funct3 = fetchedInstr & (((1 << 3) - 1) << 12)
             # get rs1
             rs1 = (fetchedInstr >> 15) & ((1 << 5) - 1)
             # get rd
@@ -303,7 +298,6 @@ class SingleStageCore(Core):
             # get rd
             rs2 = (fetchedInstr >> 20) & ((1 << 5) - 1)
 
-            # print("SW: " + str(rs1), "imm: " + str(imm))
             self.ext_dmem.writeDataMem(Address=(rs1 + twos_comp(val=imm, sign_bit=11)) & ((1 << 32) - 1),
                                        WriteData=self.myRF.readRF(rs2))
 
@@ -315,7 +309,6 @@ class SingleStageCore(Core):
         if self.state.IF["nop"]:
             self.halted = True
 
-        # print("self.nextState.IF[\"PC\"]: ", self.nextState.IF["PC"])
         if not self.state.IF["taken"] and self.state.IF["PC"] + 4 < len(self.ext_imem.IMem):
             self.nextState.IF["PC"] = self.state.IF["PC"] + 4
         else:
@@ -349,10 +342,9 @@ class FiveStageCore(Core):
     def step(self):
 
         # Your implementation
-        # if len(self.state.STAGES) > 1 and self.state.STAGES[0] == 'WB' and self.state.STAGES[1] == 'WB':
-        #     self.state.STAGES.popleft()
         self.state.IF["bubble"] = False
         for i in range(len(self.state.STAGES)):
+
             stage = self.state.STAGES[i]
             # --------------------- WB stage ---------------------
             if stage == 'WB':
@@ -364,7 +356,9 @@ class FiveStageCore(Core):
                     self.nextState.IF["nop"] = True
 
                 elif not self.state.IF["bubble"]:
+
                     if self.state.WB["wrt_enable"]:
+
                         wrt_reg_addr = self.state.WB["wrt_reg_addr"]
                         wrt_data = self.state.WB["wrt_data"]
 
@@ -372,18 +366,20 @@ class FiveStageCore(Core):
 
                     self.state.IF["bubble"] = False
 
-                # print(self.state.STAGES)
-                # self.state.STAGES.popleft()
-
             # --------------------- MEM stage --------------------
             if stage == 'MEM':
+
                 self.nextState.STAGES.append('WB')
+
                 if self.state.EX["nop"]:
+
                     self.nextState.MEM["nop"] = True
                     self.nextState.EX["nop"] = True
                     self.nextState.ID["nop"] = True
                     self.nextState.IF["nop"] = True
+
                 elif not self.state.IF["bubble"]:
+
                     if self.state.MEM["wrt_enable"]:
                         wrt_mem = self.state.MEM["wrt_mem"]
                         store_data = self.state.MEM["Store_data"]
@@ -413,13 +409,13 @@ class FiveStageCore(Core):
             if stage == 'EX':
                 self.nextState.STAGES.append('MEM')
                 if self.state.ID["nop"]:
+
                     self.nextState.EX["nop"] = True
                     self.nextState.ID["nop"] = True
                     self.nextState.IF["nop"] = True
-                # elif self.state.MEM["read_enable"]:
-                #     self.nextState.STAGES[i] = 'EX'
-                #     # self.state.IF["bubble"] = True
+
                 elif not self.state.IF["bubble"]:
+
                     # R-type
                     if self.state.EX["alu_op"] == 0b0110011:
                         # get all operation-required segments
@@ -438,7 +434,6 @@ class FiveStageCore(Core):
                         if self.state.MEM["read_enable"] and (forward_reg_MEM == rs1 or forward_reg_MEM == rs2):
                             self.nextState.STAGES[-1] = 'EX'
                             self.nextState.EX = deepcopy(self.state.EX)
-                            # self.state.IF["bubble"] = True
 
                         # forwarding if registers rs1 are not updated from the last R/I type instruction
                         if rs1 == forward_reg_EX:
@@ -481,7 +476,6 @@ class FiveStageCore(Core):
                         if self.state.MEM["read_enable"] and forward_reg_MEM == rs1:
                             self.nextState.STAGES[-1] = 'EX'
                             self.nextState.EX = deepcopy(self.state.EX)
-                            # self.state.IF["bubble"] = True
 
                         # forwarding if registers rs1 are not updated from the last instruction
                         if rs1 == forward_reg:
@@ -503,11 +497,9 @@ class FiveStageCore(Core):
 
                     # J Type
                     elif self.state.EX["alu_op"] == 0b1101111:
-                        imm = self.state.EX["imm"]
                         rd = self.state.EX["rd"]
 
                         data_rd = self.state.IF["PC"] + 4
-                        # self.nextState.IF["PC"] = self.state.IF["PC"] + twos_comp(val=imm, sign_bit=20)
 
                         # record rd register address in the next state for MEM stage
                         self.nextState.MEM["wrt_reg_addr"] = rd
@@ -530,7 +522,6 @@ class FiveStageCore(Core):
                         forward_reg = self.state.EX["forward_reg"]
                         forward_data = self.state.EX["forward_data"]
                         funct3 = self.state.EX["funct3"]
-                        imm = self.state.EX["imm"]
 
                         if rs1 == forward_reg:
                             data_rs1 = forward_data
@@ -562,7 +553,6 @@ class FiveStageCore(Core):
                         if rs1 == forward_reg:
                             rs1_value = forward_data
 
-                        # rd_mem = rs1 + sign_extended(imm)
                         rd_mem = rs1_value + twos_comp(val=imm, sign_bit=11)
 
                         # store memory address rd_mem
@@ -700,7 +690,6 @@ class FiveStageCore(Core):
                             self.state.IF["bubble"] = True
 
                         self.nextState.EX["imm"] = imm
-                        # self.nextState.ID["PC"] = self.state.IF["PC"]
                         self.nextState.EX["PC"] = self.state.ID["PC"] + twos_comp(val=imm, sign_bit=12)
                         self.nextState.EX["rs2"] = rs2
                         self.nextState.EX["rs1"] = rs1
@@ -772,17 +761,10 @@ class FiveStageCore(Core):
 
             if len(self.state.STAGES) > 0:
                 self.nextState.IF["PC"] = self.state.IF["PC"] + 4
-                # self.nextState.IF["PC"] += 4
 
             self.nextState.STAGES.append('IF')
 
         self.nextState.IF["bubble"] = self.state.IF["bubble"]
-
-        # print("IF nop: " + str(self.state.IF["nop"]), end=" ")
-        # print("ID nop: " + str(self.state.ID["nop"]), end=" ")
-        # print("EX nop: " + str(self.state.EX["nop"]), end=" ")
-        # print("MEM nop: " + str(self.state.MEM["nop"]), end=" ")
-        # print("WB nop: " + str(self.state.WB["nop"]))
 
         if self.state.IF["nop"] and self.state.ID["nop"] and self.state.EX["nop"] and self.state.MEM["nop"] and \
                 self.state.WB["nop"]:
@@ -837,19 +819,10 @@ if __name__ == "__main__":
             ssCore.step()
 
         if not fsCore.halted:
-            # printList.append(fsCore.state.STAGES)
-            # print("current PC: ", fsCore.state.IF["PC"])
             fsCore.step()
 
         if (ssCore.halted and fsCore.halted) or fsCore.cycle > 100:
             break
-
-    # for i in range(len(printList)):
-    #     for j in range(len(printList[i]) + i):
-    #         if j < i:
-    #             print(" ", end=" ")
-    #         else:
-    #             print(printList[i][j - i], end=" ")
 
     # dump SS and FS data mem.
     dmem_ss.outputDataMem()
