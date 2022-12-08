@@ -803,7 +803,7 @@ if __name__ == "__main__":
     parser.add_argument('--iodir', default="", type=str, help='Directory containing the input files.')
     args = parser.parse_args()
 
-    ioDir = os.path.abspath(args.iodir) + "/TC4"
+    ioDir = os.path.abspath(args.iodir)
     print("IO Directory:", ioDir)
 
     imem = InsMem("Imem", ioDir)
